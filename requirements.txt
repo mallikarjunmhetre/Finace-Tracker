@@ -1,0 +1,15 @@
+# Personal Finance Tracker - Python Dependencies
+# ================================================
+# This project uses ONLY Python standard library modules.
+# No third-party packages are required.
+#
+# Standard library modules used:
+#   - csv       : Reading and writing CSV data files
+#   - os        : File system operations (creating folders, clearing screen)
+#   - sys       : System exit handling
+#   - datetime  : Date formatting and validation
+#
+# To run the project:
+#   python main.py
+#
+# Python version required: 3.10+
