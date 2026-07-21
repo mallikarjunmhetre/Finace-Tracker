@@ -1,0 +1,3 @@
+# src package marker
+# This file makes Python treat the `src/` directory as a package,
+# allowing imports like: from src.utils import ...
