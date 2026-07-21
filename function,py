@@ -1,0 +1,394 @@
+"""
+functions.py - Core Business Logic for Personal Finance Tracker
+================================================================
+This module contains all the core functions that handle the application's
+main features: adding transactions, viewing records, generating summaries,
+and exporting data.
+All data is stored in a CSV file using Python's built-in `csv` module.
+Author : Mallikarjun Arjun
+License: MIT
+"""
+import csv
+import os
+from datetime import datetime, date
+from src.utils import (
+    Colors,
+    colored,
+    format_currency,
+    get_valid_float,
+    get_valid_date,
+    get_non_empty_string,
+    print_divider,
+    print_success,
+    print_error,
+    print_info,
+    get_current_date,
+)
+# ─────────────────────────────────────────────
+# Constants
+# ─────────────────────────────────────────────
+# Path to the CSV file where all transactions are stored
+DATA_FILE = "data/transactions.csv"
+# The column headers for the CSV file
+CSV_HEADERS = ["id", "date", "type", "category", "description", "amount"]
+# Valid transaction types
+TRANSACTION_TYPES = ("income", "expense")
+# Pre-defined categories for convenience
+INCOME_CATEGORIES  = ["Salary", "Freelance", "Investment", "Gift", "Other"]
+EXPENSE_CATEGORIES = ["Food", "Transport", "Rent", "Healthcare", "Entertainment",
+                      "Shopping", "Education", "Utilities", "Other"]
+# ─────────────────────────────────────────────
+# File / Data Management
+# ─────────────────────────────────────────────
+def initialize_data_file() -> None:
+    """
+    Ensure the data directory and CSV file exist.
+    Creates them with header row if they don't exist yet.
+    """
+    # Create the data/ directory if it doesn't exist
+    os.makedirs("data", exist_ok=True)
+    # Only write headers if the file is new or empty
+    if not os.path.exists(DATA_FILE) or os.path.getsize(DATA_FILE) == 0:
+        with open(DATA_FILE, mode="w", newline="", encoding="utf-8") as file:
+            writer = csv.DictWriter(file, fieldnames=CSV_HEADERS)
+            writer.writeheader()
+def load_transactions() -> list[dict]:
+    """
+    Load all transactions from the CSV file into a list of dictionaries.
+    Returns:
+        list[dict]: A list of transaction records, each as a dict.
+    """
+    initialize_data_file()
+    transactions = []
+    try:
+        with open(DATA_FILE, mode="r", newline="", encoding="utf-8") as file:
+            reader = csv.DictReader(file)
+            for row in reader:
+                # Convert amount to float for calculations
+                row["amount"] = float(row["amount"])
+                transactions.append(row)
+    except FileNotFoundError:
+        pass  # File doesn't exist yet; return empty list
+    except Exception as error:
+        print_error(f"Could not load data: {error}")
+    return transactions
+def save_transaction(transaction: dict) -> None:
+    """
+    Append a single transaction record to the CSV file.
+    Args:
+        transaction (dict): A dictionary with keys matching CSV_HEADERS.
+    """
+    initialize_data_file()
+    try:
+        with open(DATA_FILE, mode="a", newline="", encoding="utf-8") as file:
+            writer = csv.DictWriter(file, fieldnames=CSV_HEADERS)
+            writer.writerow(transaction)
+    except IOError as error:
+        print_error(f"Could not save transaction: {error}")
+def get_next_id(transactions: list[dict]) -> int:
+    """
+    Calculate the next available transaction ID (auto-increment).
+    Args:
+        transactions (list[dict]): The current list of transactions.
+    Returns:
+        int: The next unique transaction ID.
+    """
+    if not transactions:
+        return 1
+    # Find the maximum existing ID and add 1
+    max_id = max(int(t["id"]) for t in transactions)
+    return max_id + 1
+# ─────────────────────────────────────────────
+# Feature: Add Transaction
+# ─────────────────────────────────────────────
+def pick_category(categories: list[str]) -> str:
+    """
+    Display a numbered list of categories and let the user pick one.
+    Args:
+        categories (list[str]): The list of category options.
+    Returns:
+        str: The selected category name.
+    """
+    print(colored("\n  Select a category:", Colors.WHITE))
+    for i, category in enumerate(categories, start=1):
+        print(colored(f"    {i}. {category}", Colors.CYAN))
+    while True:
+        try:
+            choice = int(input(colored("\n  Enter category number: ", Colors.WHITE)))
+            if 1 <= choice <= len(categories):
+                return categories[choice - 1]
+            print(colored("  ⚠  Please choose a valid number from the list.", Colors.YELLOW))
+        except ValueError:
+            print(colored("  ✗  Enter a number only.", Colors.RED))
+def add_transaction(transaction_type: str) -> None:
+    """
+    Interactively collect details from the user and save a new transaction.
+    Args:
+        transaction_type (str): Either 'income' or 'expense'.
+    """
+    transactions = load_transactions()
+    new_id       = get_next_id(transactions)
+    type_label   = transaction_type.capitalize()
+    print(colored(f"\n  ── Adding New {type_label} ──\n", Colors.BOLD + Colors.GREEN))
+    # Choose the relevant category list based on transaction type
+    categories = INCOME_CATEGORIES if transaction_type == "income" else EXPENSE_CATEGORIES
+    category   = pick_category(categories)
+    # Collect remaining details
+    description = get_non_empty_string(colored("\n  Description : ", Colors.WHITE))
+    amount      = get_valid_float(colored("  Amount (₹)  : ", Colors.WHITE))
+    date_str    = get_valid_date(
+        colored("  Date (YYYY-MM-DD) [Enter = today]: ", Colors.WHITE)
+    )
+    # Build the transaction record
+    transaction = {
+        "id"         : new_id,
+        "date"       : date_str,
+        "type"       : transaction_type,
+        "category"   : category,
+        "description": description,
+        "amount"     : f"{amount:.2f}",
+    }
+    save_transaction(transaction)
+    print_success(
+        f"{type_label} of {format_currency(amount)} added successfully! [ID: {new_id}]"
+    )
+# ─────────────────────────────────────────────
+# Feature: View Transactions
+# ─────────────────────────────────────────────
+def _print_transaction_table(transactions: list[dict]) -> None:
+    """
+    Print a formatted table of transactions to the terminal.
+    Args:
+        transactions (list[dict]): The list of transactions to display.
+    """
+    if not transactions:
+        print_info("No transactions found.")
+        return
+    # Table column widths
+    col_widths = {"id": 4, "date": 12, "type": 9, "category": 14, "description": 22, "amount": 12}
+    # Print header row
+    header = (
+        f"  {'ID':<{col_widths['id']}} "
+        f"{'Date':<{col_widths['date']}} "
+        f"{'Type':<{col_widths['type']}} "
+        f"{'Category':<{col_widths['category']}} "
+        f"{'Description':<{col_widths['description']}} "
+        f"{'Amount':>{col_widths['amount']}}"
+    )
+    print(colored(header, Colors.BOLD + Colors.WHITE))
+    print_divider()
+    # Print each transaction row
+    for t in transactions:
+        # Choose color based on transaction type
+        amount_color = Colors.GREEN if t["type"] == "income" else Colors.RED
+        type_color   = Colors.GREEN if t["type"] == "income" else Colors.RED
+        type_icon = "▲" if t["type"] == "income" else "▼"
+        row = (
+            f"  {t['id']:<{col_widths['id']}} "
+            f"{t['date']:<{col_widths['date']}} "
+            f"{type_icon} {t['type']:<{col_widths['type'] - 2}} "
+            f"{t['category']:<{col_widths['category']}} "
+            f"{t['description'][:20]:<{col_widths['description']}} "
+        )
+        print(colored(row, type_color), end="")
+        print(colored(f"{format_currency(t['amount']):>{col_widths['amount']}}", amount_color))
+    print_divider()
+    print(colored(f"  Total records: {len(transactions)}", Colors.CYAN))
+def view_all_transactions() -> None:
+    """Load and display all saved transactions in a formatted table."""
+    transactions = load_transactions()
+    print(colored(f"\n  All Transactions ({len(transactions)} records)\n", Colors.BOLD))
+    _print_transaction_table(transactions)
+def view_transactions_by_type(transaction_type: str) -> None:
+    """
+    Filter and display transactions by type (income or expense).
+    Args:
+        transaction_type (str): 'income' or 'expense'.
+    """
+    all_transactions = load_transactions()
+    filtered = [t for t in all_transactions if t["type"] == transaction_type]
+    label    = transaction_type.capitalize()
+    print(colored(f"\n  {label} Transactions ({len(filtered)} records)\n", Colors.BOLD))
+    _print_transaction_table(filtered)
+def view_transactions_by_month() -> None:
+    """Ask the user for a month/year and display matching transactions."""
+    print(colored("\n  Filter by Month", Colors.BOLD))
+    while True:
+        month_input = input(colored("  Enter month and year (MM-YYYY): ", Colors.WHITE)).strip()
+        try:
+            # Validate format using strptime
+            datetime.strptime(month_input, "%m-%Y")
+            break
+        except ValueError:
+            print(colored("  ✗  Invalid format. Use MM-YYYY (e.g., 07-2025).", Colors.RED))
+    month, year = month_input.split("-")
+    prefix      = f"{year}-{month.zfill(2)}"  # e.g., "2025-07"
+    all_transactions = load_transactions()
+    filtered = [t for t in all_transactions if t["date"].startswith(prefix)]
+    print(colored(f"\n  Transactions for {month}/{year} ({len(filtered)} records)\n", Colors.BOLD))
+    _print_transaction_table(filtered)
+# ─────────────────────────────────────────────
+# Feature: Financial Summary
+# ─────────────────────────────────────────────
+def _calculate_summary(transactions: list[dict]) -> dict:
+    """
+    Calculate total income, total expenses, and net balance.
+    Args:
+        transactions (list[dict]): List of transaction records.
+    Returns:
+        dict: A dictionary with 'income', 'expense', and 'balance' totals.
+    """
+    total_income  = sum(t["amount"] for t in transactions if t["type"] == "income")
+    total_expense = sum(t["amount"] for t in transactions if t["type"] == "expense")
+    net_balance   = total_income - total_expense
+    return {
+        "income" : total_income,
+        "expense": total_expense,
+        "balance": net_balance,
+    }
+def view_summary() -> None:
+    """Display a complete financial summary with totals and category breakdowns."""
+    transactions = load_transactions()
+    if not transactions:
+        print_info("No transactions found. Add some income or expenses first.")
+        return
+    summary = _calculate_summary(transactions)
+    # ── Overall Summary ──
+    print(colored("\n  ── Overall Financial Summary ──\n", Colors.BOLD))
+    print_divider()
+    print(colored(f"  {'Total Income'  :<25} {format_currency(summary['income']):>12}", Colors.GREEN))
+    print(colored(f"  {'Total Expenses':<25} {format_currency(summary['expense']):>12}", Colors.RED))
+    print_divider()
+    # Show net balance in green (positive) or red (negative)
+    balance_color = Colors.GREEN if summary["balance"] >= 0 else Colors.RED
+    balance_icon  = "▲" if summary["balance"] >= 0 else "▼"
+    print(colored(
+        f"  {balance_icon} {'Net Balance':<23} {format_currency(summary['balance']):>12}",
+        Colors.BOLD + balance_color,
+    ))
+    print_divider()
+    # ── Expense Breakdown by Category ──
+    expense_records = [t for t in transactions if t["type"] == "expense"]
+    if expense_records:
+        print(colored("\n  ── Expense Breakdown by Category ──\n", Colors.BOLD))
+        category_totals: dict[str, float] = {}
+        for t in expense_records:
+            category_totals[t["category"]] = category_totals.get(t["category"], 0) + t["amount"]
+        # Sort categories by amount (highest first)
+        sorted_categories = sorted(category_totals.items(), key=lambda x: x[1], reverse=True)
+        for cat, total in sorted_categories:
+            # Calculate percentage of total expenses
+            percentage = (total / summary["expense"] * 100) if summary["expense"] > 0 else 0
+            bar        = "█" * int(percentage / 5)  # Simple ASCII bar chart (max 20 chars)
+            print(colored(
+                f"  {cat:<15} {format_currency(total):>12}  {bar:<20} {percentage:5.1f}%",
+                Colors.CYAN,
+            ))
+    # ── Income Breakdown by Category ──
+    income_records = [t for t in transactions if t["type"] == "income"]
+    if income_records:
+        print(colored("\n  ── Income Breakdown by Category ──\n", Colors.BOLD))
+        category_totals = {}
+        for t in income_records:
+            category_totals[t["category"]] = category_totals.get(t["category"], 0) + t["amount"]
+        for cat, total in sorted(category_totals.items(), key=lambda x: x[1], reverse=True):
+            percentage = (total / summary["income"] * 100) if summary["income"] > 0 else 0
+            bar        = "█" * int(percentage / 5)
+            print(colored(
+                f"  {cat:<15} {format_currency(total):>12}  {bar:<20} {percentage:5.1f}%",
+                Colors.GREEN,
+            ))
+# ─────────────────────────────────────────────
+# Feature: Delete Transaction
+# ─────────────────────────────────────────────
+def delete_transaction() -> None:
+    """
+    Prompt the user for a transaction ID and remove that record from the CSV.
+    """
+    transactions = load_transactions()
+    if not transactions:
+        print_info("No transactions to delete.")
+        return
+    # Show the full list first so the user can pick an ID
+    _print_transaction_table(transactions)
+    while True:
+        try:
+            target_id = int(input(colored("\n  Enter the ID of the transaction to delete: ", Colors.WHITE)))
+            break
+        except ValueError:
+            print(colored("  ✗  Please enter a valid numeric ID.", Colors.RED))
+    # Check if the ID exists
+    matching = [t for t in transactions if int(t["id"]) == target_id]
+    if not matching:
+        print_error(f"No transaction found with ID {target_id}.")
+        return
+    record = matching[0]
+    confirm = input(colored(
+        f"\n  Delete '{record['description']}' ({format_currency(record['amount'])})? [y/N]: ",
+        Colors.YELLOW,
+    )).strip().lower()
+    if confirm == "y":
+        updated = [t for t in transactions if int(t["id"]) != target_id]
+        _rewrite_csv(updated)
+        print_success(f"Transaction ID {target_id} deleted successfully.")
+    else:
+        print_info("Deletion cancelled.")
+def _rewrite_csv(transactions: list[dict]) -> None:
+    """
+    Overwrite the CSV file with the provided list of transactions.
+    Used after a deletion to re-save the remaining records.
+    Args:
+        transactions (list[dict]): The updated list of transactions.
+    """
+    try:
+        with open(DATA_FILE, mode="w", newline="", encoding="utf-8") as file:
+            writer = csv.DictWriter(file, fieldnames=CSV_HEADERS)
+            writer.writeheader()
+            for t in transactions:
+                writer.writerow(t)
+    except IOError as error:
+        print_error(f"Could not update data file: {error}")
+# ─────────────────────────────────────────────
+# Feature: Export to Text Report
+# ─────────────────────────────────────────────
+def export_report() -> None:
+    """
+    Generate a plain-text financial report and save it to the reports/ folder.
+    The report includes all transactions and a financial summary.
+    """
+    transactions = load_transactions()
+    if not transactions:
+        print_info("No data to export. Please add transactions first.")
+        return
+    os.makedirs("reports", exist_ok=True)
+    timestamp   = datetime.now().strftime("%Y%m%d_%H%M%S")
+    report_file = f"reports/finance_report_{timestamp}.txt"
+    summary     = _calculate_summary(transactions)
+    try:
+        with open(report_file, mode="w", encoding="utf-8") as file:
+            file.write("=" * 60 + "\n")
+            file.write("       PERSONAL FINANCE TRACKER — REPORT\n")
+            file.write(f"       Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            file.write("=" * 60 + "\n\n")
+            # Write all transactions
+            file.write("ALL TRANSACTIONS\n")
+            file.write("-" * 60 + "\n")
+            file.write(f"{'ID':<4} {'Date':<12} {'Type':<10} {'Category':<15} {'Description':<22} {'Amount':>10}\n")
+            file.write("-" * 60 + "\n")
+            for t in transactions:
+                file.write(
+                    f"{t['id']:<4} {t['date']:<12} {t['type']:<10} "
+                    f"{t['category']:<15} {t['description'][:20]:<22} "
+                    f"{format_currency(t['amount']):>10}\n"
+                )
+            # Write summary
+            file.write("\n" + "=" * 60 + "\n")
+            file.write("FINANCIAL SUMMARY\n")
+            file.write("-" * 60 + "\n")
+            file.write(f"{'Total Income'  :<30} {format_currency(summary['income']):>12}\n")
+            file.write(f"{'Total Expenses':<30} {format_currency(summary['expense']):>12}\n")
+            file.write(f"{'Net Balance'   :<30} {format_currency(summary['balance']):>12}\n")
+            file.write("=" * 60 + "\n")
+        print_success(f"Report exported successfully → {report_file}")
+    except IOError as error:
+        print_error(f"Could not write report: {error}")
