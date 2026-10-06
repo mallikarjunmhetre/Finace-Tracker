@@ -29,7 +29,7 @@
 **Personal Finance Tracker** is a beginner-friendly Python CLI application that helps you take control of your money. Whether you're tracking daily coffee expenses or monthly salary, this tool gives you a clear picture of where your money comes from and where it goes.
 This project was built to demonstrate:
 - Clean, modular Python code
-- Real-world data handling with CSV
+- Real-world data handling with C
 - Professional terminal UX with ANSI colors
 - PEP 8 coding standards and best practices
 > ✅ **No pip install needed** — uses only Python's built-in modules!
