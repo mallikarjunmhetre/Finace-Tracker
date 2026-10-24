@@ -9,6 +9,8 @@
 [![Status](https://img.shields.io/badge/Status-Active-brightgreen?style=for-the-badge)]()
 > A **clean, menu-driven command-line application** to track your daily income and expenses,  
 > view summaries, and export financial reports — built entirely with Python's standard library.
+>
+> 
 ![Finance Tracker Banner](assets/screenshot.png)
 </div>
 ---
