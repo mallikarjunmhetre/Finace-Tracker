@@ -3,10 +3,15 @@
 ### *Track. Save. Grow.*
  
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
+
 [![Standard Library](https://img.shields.io/badge/Dependencies-None%20(Std%20Lib%20Only)-success?style=for-the-badge)](requirements.txt)
+
 [![PEP 8](https://img.shields.io/badge/Code%20Style-PEP%208-informational?style=for-the-badge)](https://peps.python.org/pep-0008/)
+
 [![Status](https://img.shields.io/badge/Status-Active-brightgreen?style=for-the-badge)]()
+
 > A **clean, menu-driven command-line application** to track your daily income and expenses,  
 > view summaries, and export financial reports — built entirely with Python's standard library.
 >
