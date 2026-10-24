@@ -1,6 +1,7 @@
 <div align="center">
 # 💰 Personal Finance Tracker
 ### *Track. Save. Grow.*
+ 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
 [![Standard Library](https://img.shields.io/badge/Dependencies-None%20(Std%20Lib%20Only)-success?style=for-the-badge)](requirements.txt)
